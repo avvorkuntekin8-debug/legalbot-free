@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 // 🔧 AYARLAR (DEĞİŞTİR!)
-const BOT_TOKEN = 'YOUR_BOT_TOKEN'; // @BotFather
+const BOT_TOKEN = '8799998261:AAHXiOLgPFQ6JZQ9njqRfd6TusA2bAp2oCo'; // @BotFather
 const bot = new Telegraf(BOT_TOKEN);
 
 // 🗄️ Hafif JSON DB (ücretsiz)
