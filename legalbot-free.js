@@ -235,11 +235,11 @@ bot.action('templates', (ctx) => {
 });
 
 // 🔄 BOT BAŞLAT
-bot.launch();
-console.log('⚖️ LegalBot FREE Aktif! Port: 3000');
-
-// Graceful shutdown
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+bot.launch({
+  dropPendingUpdates: true,  // ← BU SATIRI EKLE!
+  allowedUpdates: ['message', 'callback_query']
+}).then(() => {
+  console.log('⚖️ LegalBot Aktif!');
+});
 
 // 🆓 package.json (aynı klasöre kaydet)
