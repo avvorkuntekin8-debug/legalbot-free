@@ -1,40 +1,24 @@
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
 
-// TOKEN Environment'dan
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// Hafif DB
+// DB
 let db = { users: {} };
-const DB_FILE = 'legalbot.db';
-
-// DB Fonksiyonları
-function saveDB() {
-  try { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2)); } catch(e){}
-}
-function loadDB() {
-  try { if (fs.existsSync(DB_FILE)) db = JSON.parse(fs.readFileSync(DB_FILE)); } catch(e){}
-}
+function saveDB() { try { fs.writeFileSync('db.json', JSON.stringify(db)); } catch(e){} }
+function loadDB() { try { if (fs.existsSync('db.json')) db = JSON.parse(fs.readFileSync('db.json')); } catch(e){} }
 loadDB();
 
 bot.start((ctx) => {
   const uid = ctx.from.id.toString();
-  if (!db.users[uid]) db.users[uid] = { name: ctx.from.first_name, count: 0 };
+  if (!db.users[uid]) db.users[uid] = { count: 0 };
   
-  ctx.reply(`⚖️ <b>Hukuk Asistanı FREE</b>
-
-📝 <b>/sozlesme kira "Ayşe" "Kadıköy" "4500₺"</b>
-
-✅ PDF Sözleşme
-✅ Müvekkil Takibi
-✅ Dijital Onay
-
-<b>Sözleşmelerin:</b> ${db.users[uid].count}`, {
+  ctx.reply(`⚖️ <b>Hukuk Asistanı FREE</b>\n\n📝 <b>/sozlesme kira "Ayşe" "Kadıköy" "4500₺"</b>\n\nSözleşmelerin: ${db.users[uid].count}`, {
     parse_mode: 'HTML',
     reply_markup: {
       inline_keyboard: [
-        [{ text: "📋 Sözleşme Oluştur", callback_data: "contract" }],
-        [{ text: "⭐ Pro 99₺/ay", callback_data: "pro" }]
+        [{ text: "📋 Sözleşme", callback_data: "contract" }],
+        [{ text: "⭐ Pro", callback_data: "pro" }]
       ]
     }
   });
@@ -43,55 +27,54 @@ bot.start((ctx) => {
 
 bot.command('sozlesme', (ctx) => {
   const args = ctx.message.text.split(/\s+/).slice(1);
-  if (args.length < 3) {
-    return ctx.reply('❌ <b>Örnek:</b>\n/sozlesme kira "Ayşe" "Kadıköy" "4500₺"');
-  }
+  if (args.length < 3) return ctx.reply('❌ Örnek: /sozlesme kira "Ayşe" "Kadıköy" "4500₺"');
   
   const [type, name, city, price = '5000₺'] = args;
   const uid = ctx.from.id.toString();
   
-  const contract = `HUKUK ASİSTANI - SÖZLEŞME
-
-📄 Tür: ${type.toUpperCase()}
-👤 Müşteri: ${name}
-📍 ${city}
-💰 ${price}
-📅 ${new Date().toLocaleString('tr-TR')}
-
-================================
-İmzalar:
-Taraf 1: ________________
-Taraf 2: ________________
-
-⚖️ LegalBot FREE tarafından oluşturuldu
-t.me/HukukAsistaniBot`;
-
+  const contract = `HUKUK ASİSTANI SÖZLEŞMESİ\n\nTür: ${type.toUpperCase()}\nMüşteri: ${name}\n${city}\n${price}\n\n${new Date().toLocaleString('tr-TR')}`;
+  
   db.users[uid].count++;
   saveDB();
   
-  ctx.reply('✅ <b>SÖZLEŞME HAZIR!</b>', {
-    reply_markup: {
-      inline_keyboard: [[{ text: "📥 PDF İndir", callback_data: "pdf" }]]
-    }
-  });
-  
   ctx.replyWithDocument({
-    source: Buffer.from(contract, 'utf8'),
-    filename: `sozlesme_${Date.now()}.pdf`
+    source: Buffer.from(contract),
+    filename: 'sozlesme.pdf'
   });
 });
 
-bot.launch({
-  dropPendingUpdates: true
-}).then(() => {
-  console.log('✅ LegalBot 100% CANLI!');
-  console.log('✅ Telegram polling aktif');
-});
+// 🎯 409 FIX - Polling restart
+let updateOffset = 0;
+async function safeLaunch() {
+  try {
+    await bot.launch({
+      dropPendingUpdates: true,
+      allowedUpdates: ['message', 'callback_query'],
+      polling: {
+        params: {
+          allowed_updates: ['message', 'callback_query']
+        }
+      }
+    });
+    console.log('✅ LegalBot 100% CANLI!');
+  } catch (error) {
+    if (error.response?.error_code === 409) {
+      console.log('🔄 409 Conflict - 10sn sonra retry...');
+      setTimeout(safeLaunch, 10000);
+    } else {
+      console.error('❌ Hata:', error.message);
+      setTimeout(safeLaunch, 5000);
+    }
+  }
+}
 
-// Render health check (port sorunu çözülür)
-process.on('SIGTERM', () => {
-  console.log('🛑 Bot kapatılıyor...');
-  process.exit(0);
-});
+safeLaunch();
 
-console.log('⚖️ Bot başlatılıyor...');
+// Graceful shutdown
+process.once('SIGINT', () => {
+  console.log('🛑 Kapatılıyor...');
+  bot.stop('SIGINT');
+});
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+console.log('⚖️ Başlatılıyor...');
