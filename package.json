@@ -1,0 +1,16 @@
+{
+  "name": "legalbot-free",
+  "version": "1.0.0",
+  "main": "legalbot-free.js",
+  "scripts": {
+    "start": "node legalbot-free.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.3"
+  },
+  "description": "",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
