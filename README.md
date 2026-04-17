@@ -1,0 +1,2 @@
+# legalbot-free
+Legalbot
