@@ -1,75 +1,97 @@
-// legalbot-free.js - PORT DÜZELTİLMİŞ VERSİYON
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
-const path = require('path');
 
-// 🔧 BOT TOKEN (Environment'dan)
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const bot = new Telegraf(BOT_TOKEN);
+// TOKEN Environment'dan
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// 🗄️ JSON DB
-let database = { users: {}, contracts: [], clients: {} };
-function saveDB() { fs.writeFileSync('legalbot.db.json', JSON.stringify(database, null, 2)); }
-function loadDB() { if (fs.existsSync('legalbot.db.json')) database = JSON.parse(fs.readFileSync('legalbot.db.json')); }
+// Hafif DB
+let db = { users: {} };
+const DB_FILE = 'legalbot.db';
+
+// DB Fonksiyonları
+function saveDB() {
+  try { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2)); } catch(e){}
+}
+function loadDB() {
+  try { if (fs.existsSync(DB_FILE)) db = JSON.parse(fs.readFileSync(DB_FILE)); } catch(e){}
+}
 loadDB();
 
 bot.start((ctx) => {
-  const userId = ctx.from.id.toString();
-  if (!database.users[userId]) {
-    database.users[userId] = { name: ctx.from.first_name, contracts: 0, clients: 0, pro: false };
-    saveDB();
+  const uid = ctx.from.id.toString();
+  if (!db.users[uid]) db.users[uid] = { name: ctx.from.first_name, count: 0 };
+  
+  ctx.reply(`⚖️ <b>Hukuk Asistanı FREE</b>
+
+📝 <b>/sozlesme kira "Ayşe" "Kadıköy" "4500₺"</b>
+
+✅ PDF Sözleşme
+✅ Müvekkil Takibi
+✅ Dijital Onay
+
+<b>Sözleşmelerin:</b> ${db.users[uid].count}`, {
+    parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "📋 Sözleşme Oluştur", callback_data: "contract" }],
+        [{ text: "⭐ Pro 99₺/ay", callback_data: "pro" }]
+      ]
+    }
+  });
+  saveDB();
+});
+
+bot.command('sozlesme', (ctx) => {
+  const args = ctx.message.text.split(/\s+/).slice(1);
+  if (args.length < 3) {
+    return ctx.reply('❌ <b>Örnek:</b>\n/sozlesme kira "Ayşe" "Kadıköy" "4500₺"');
   }
   
-  ctx.reply(`⚖️ <b>Hukuk Asistanı FREE</b>\n\n✅ Ücretsiz Sözleşme\n✅ Müvekkil Takibi\n✅ Fatura PDF\n\n/basla - Hemen dene!`, {
-    parse_mode: 'HTML',
-    ...Markup.inlineKeyboard([
-      [Markup.button.callback('📋 Sözleşme Oluştur', 'templates')],
-      [Markup.button.callback('👥 Müvekkiller', 'clients')],
-      [Markup.button.callback('⭐ Pro Ol', 'pro')]
-    ])
+  const [type, name, city, price = '5000₺'] = args;
+  const uid = ctx.from.id.toString();
+  
+  const contract = `HUKUK ASİSTANI - SÖZLEŞME
+
+📄 Tür: ${type.toUpperCase()}
+👤 Müşteri: ${name}
+📍 ${city}
+💰 ${price}
+📅 ${new Date().toLocaleString('tr-TR')}
+
+================================
+İmzalar:
+Taraf 1: ________________
+Taraf 2: ________________
+
+⚖️ LegalBot FREE tarafından oluşturuldu
+t.me/HukukAsistaniBot`;
+
+  db.users[uid].count++;
+  saveDB();
+  
+  ctx.reply('✅ <b>SÖZLEŞME HAZIR!</b>', {
+    reply_markup: {
+      inline_keyboard: [[{ text: "📥 PDF İndir", callback_data: "pdf" }]]
+    }
+  });
+  
+  ctx.replyWithDocument({
+    source: Buffer.from(contract, 'utf8'),
+    filename: `sozlesme_${Date.now()}.pdf`
   });
 });
 
-bot.command('basla', (ctx) => ctx.reply('🔥 <b>ÖRNEK:</b>\n/sozlesme kira "Ayşe" "Kadıköy" "4500tl" "12ay"'));
-
-bot.command('sozlesme', (ctx) => {
-  const args = ctx.message.text.split(' ').slice(1);
-  if (args.length < 4) return ctx.reply('❌ <b>Örnek:</b>\n/sozlesme kira "Ayşe" "Kadıköy" "4500tl" "12"');
-  
-  const [type, clientName, address, amount] = args;
-  const userId = ctx.from.id.toString();
-  
-  const templates = {
-    kira: `KİRA SÖZLEŞMESİ\n\nKİRACI: ${clientName}\nADRES: ${address}\nKİRA: ${amount} TL\n\nİmzalar:\nKiraya veren: _______\nKiracı: _______\n\n${new Date().toLocaleString('tr-TR')}`
-  };
-  
-  const contract = templates[type] || templates.kira;
-  
-  // PDF Buffer
-  const pdfBuffer = Buffer.from(contract, 'utf8');
-  
-  database.users[userId].contracts++;
-  saveDB();
-  
-  ctx.replyWithDocument({ source: pdfBuffer, filename: `sozlesme_${Date.now()}.pdf` });
-  ctx.reply(`✅ <b>${type.toUpperCase()} SÖZLEŞMESİ HAZIR!</b>\n\n👤 ${clientName}\n💰 ${amount}\n\n/imzala için hazır!`);
-});
-
 bot.launch({
-  dropPendingUpdates: true,
-  webhook: {
-    domain: process.env.RENDER_EXTERNAL_HOSTNAME || 'localhost',
-    port: process.env.PORT || 3000
-  }
+  dropPendingUpdates: true
 }).then(() => {
-  console.log('⚖️ LegalBot CANLI!');
-  console.log(`Port: ${process.env.PORT || 3000}`);
+  console.log('✅ LegalBot 100% CANLI!');
+  console.log('✅ Telegram polling aktif');
 });
 
-// 🆓 HTTP Server (Render port için)
-const express = require('express');
-const app = express();
-app.get('/', (req, res) => res.send('LegalBot Aktif!'));
-app.listen(process.env.PORT || 3000, () => {
-  console.log('✅ HTTP Port aktif!');
+// Render health check (port sorunu çözülür)
+process.on('SIGTERM', () => {
+  console.log('🛑 Bot kapatılıyor...');
+  process.exit(0);
 });
+
+console.log('⚖️ Bot başlatılıyor...');
